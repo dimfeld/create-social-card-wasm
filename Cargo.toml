@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-create-social-card = { "path"="../create-social-card" }
+create-social-card = { "git"="https://github.com/dimfeld/create-social-card" }
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
