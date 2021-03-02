@@ -1,8 +1,9 @@
 mod utils;
 use ab_glyph::FontRef;
-use create_social_card::{overlay_text, OverlayOptions, Rect, Shadow};
+use create_social_card::{overlay_text, OverlayOptions};
 use js_sys::Error;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 use wasm_bindgen::prelude::*;
 
@@ -13,13 +14,10 @@ use wasm_bindgen::prelude::*;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[derive(Debug, Deserialize)]
-pub struct Options {
-    text: String,
-    text_rect: Rect,
-    min_size: f32,
-    max_size: f32,
-    color: String,
-    shadow: Option<Shadow>,
+pub struct Options<'a> {
+    background: Box<[u8]>,
+    fonts: HashMap<String, Box<[u8]>>,
+    blocks: Vec<create_social_card::Block<'a>>,
 }
 
 fn wrap_error<T: std::string::ToString>(e: T) -> Error {
@@ -29,27 +27,26 @@ fn wrap_error<T: std::string::ToString>(e: T) -> Error {
 }
 
 #[wasm_bindgen]
-pub fn create_card(
-    background: &[u8],
-    font: &[u8],
-    options: &JsValue,
-) -> Result<Box<[u8]>, JsValue> {
-    let input: Options = options
-        .into_serde()
-        .map_err(|e| wrap_error(format!("{}: {:?}", e.to_string(), options)))?;
+pub fn create_card(options: JsValue) -> Result<Box<[u8]>, JsValue> {
+    let input: Options =
+        serde_wasm_bindgen::from_value(options).map_err(|e| wrap_error(e.to_string()))?;
 
-    let input_image = image::load_from_memory(background).map_err(wrap_error)?;
-    let font = FontRef::try_from_slice(font).map_err(wrap_error)?;
+    let input_image = image::load_from_memory(&input.background).map_err(wrap_error)?;
+    let fonts = input
+        .fonts
+        .iter()
+        .map(|(name, font)| {
+            Ok(create_social_card::FontDef {
+                name: std::borrow::Cow::from(name),
+                font: FontRef::try_from_slice(font).map_err(wrap_error)?,
+            })
+        })
+        .collect::<Result<Vec<_>, JsValue>>()?;
 
     let options = OverlayOptions {
-        text: &input.text,
         background: input_image,
-        font: &font,
-        text_rect: &input.text_rect,
-        min_size: input.min_size,
-        max_size: input.max_size,
-        color: &input.color,
-        shadow: input.shadow.as_ref(),
+        fonts: &fonts,
+        blocks: &input.blocks,
     };
 
     let result_image = overlay_text(&options).map_err(wrap_error)?;
