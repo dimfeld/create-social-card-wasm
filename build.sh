@@ -1,1 +1,1 @@
-wasm-pack build --scope dimfeld --target nodejs "$@"
+wasm-pack build --scope dimfeld --target web "$@"
